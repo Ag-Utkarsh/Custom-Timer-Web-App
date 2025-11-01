@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Timer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Use a modern, readable font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* Apply the font and base styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+            -webkit-tap-highlight-color: transparent; /* Disable tap flash on mobile */
+        }
+        
+        /* Custom styles for the timer display */
+        #current-time {
+            font-size: 10rem; /* Huge font size */
+            line-height: 1;
+            font-weight: 900; /* Bolder */
+        }
+
+        /* Ensure min height for the app to fill the screen on mobile */
+        html, body {
+            height: 100%;
+        }
+        main {
+            min-height: 100vh;
+        }
+
+        /* Custom transition for background color */
+        #timer-screen {
+            transition: background-color 0.5s ease-in-out;
+        }
+
+        /* Hide number input arrows */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white overflow-hidden">
+
+    <main class="max-w-lg mx-auto p-4 flex flex-col h-full">
+        
+        <!-- === CONFIGURATION SCREEN === -->
+        <div id="config-screen" class="flex flex-col space-y-4">
+            <h1 class="text-3xl font-bold text-center text-blue-400">Interval Timer</h1>
+            
+            <!-- Add Timer Form -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold mb-3">1. Add Timer Segments</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="text" id="activity-name" placeholder="Activity (e.g., Sprint)" class="col-span-2 bg-gray-700 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="number" id="activity-duration" placeholder="Duration (seconds)" class="col-span-2 bg-gray-700 p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="add-segment-btn" class="col-span-2 bg-blue-600 text-white font-semibold py-3 px-4 rounded-md shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 active:scale-95 transition-transform">
+                        Add Segment
+                    </button>
+                </div>
+            </div>
+
+            <!-- Segment List -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold mb-3">2. Your Routine</h2>
+                <div id="segment-list" class="space-y-2 max-h-48 overflow-y-auto">
+                    <p class="text-gray-400">Add segments to see your routine here.</p>
+                </div>
+            </div>
+
+            <!-- Number of Sets -->
+            <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold mb-3">3. How many sets?</h2>
+                <input type="number" id="set-count" value="1" min="1" class="bg-gray-700 w-full p-3 rounded-md text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Start Button -->
+            <button id="start-workout-btn" class="bg-green-600 text-white text-2xl font-bold py-6 px-4 rounded-lg shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-900 active:scale-95 transition-transform disabled:bg-gray-600 disabled:opacity-50">
+                Start Workout
+            </button>
+        </div>
+
+        <!-- === TIMER SCREEN === -->
+        <div id="timer-screen" class="hidden flex-col h-full justify-between items-center text-center p-4">
+            <!-- Top Info: Set and Next Activity -->
+            <div class="w-full">
+                <div id="current-set-display" class="text-3xl font-semibold text-gray-300">Set 1 / 4</div>
+                <div id="next-activity-display" class_="text-xl font-medium text-gray-400">Next: Jog</div>
+            </div>
+
+            <!-- Main Timer Display -->
+            <div class="flex flex-col items-center justify-center my-8">
+                <div id="current-activity-display" class="text-5xl font-bold mb-4">Sprint</div>
+                <div id="current-time" class="text-white">30</div>
+            </div>
+
+            <!-- Controls -->
+            <div class="w-full grid grid-cols-2 gap-4">
+                <button id="pause-resume-btn" class="bg-yellow-500 text-gray-900 text-2xl font-bold py-6 rounded-lg shadow-lg active:scale-95 transition-transform">
+                    Pause
+                </button>
+                <button id="reset-btn" class="bg-red-600 text-white text-2xl font-bold py-6 rounded-lg shadow-lg active:scale-95 transition-transform">
+                    Reset
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // === DOM Elements ===
+        const configScreen = document.getElementById('config-screen');
+        const timerScreen = document.getElementById('timer-screen');
+
+        const addSegmentBtn = document.getElementById('add-segment-btn');
+        const activityNameInput = document.getElementById('activity-name');
+        const activityDurationInput = document.getElementById('activity-duration');
+        const segmentList = document.getElementById('segment-list');
+        
+        const setCountInput = document.getElementById('set-count');
+        const startWorkoutBtn = document.getElementById('start-workout-btn');
+
+        const currentSetDisplay = document.getElementById('current-set-display');
+        const nextActivityDisplay = document.getElementById('next-activity-display');
+        const currentActivityDisplay = document.getElementById('current-activity-display');
+        const currentTimeDisplay = document.getElementById('current-time');
+        const pauseResumeBtn = document.getElementById('pause-resume-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // === App State ===
+        let segments = [];
+        let totalSets = 1;
+        let currentSet = 1;
+        let currentSegmentIndex = 0;
+        let timeLeft = 0;
+        let timerInterval = null;
+        let isPaused = false;
+        
+        // Web Audio API for sound
+        let audioCtx;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') {
+                console.log('AudioContext is suspended. Will resume on user gesture.');
+            }
+        } catch (e) {
+            console.warn('Web Audio API is not supported in this browser');
+        }
+
+        // === Functions ===
+
+        /**
+         * Plays a beep sound.
+         * @param {number} duration - Duration of the beep in ms.
+         * @param {number} frequency - Frequency in Hz.
+         ** @param {number} volume - Volume (0 to 1).
+         * @param {string} type - Waveform type (sine, square, sawtooth, triangle).
+         */
+        function beep(duration = 200, frequency = 880, volume = 0.5, type = 'sine') {
+            if (!audioCtx) {
+                console.log('Cannot beep, AudioContext not available.');
+                return; // Audio not supported
+            }
+            
+            // Check state again, just in case
+            if (audioCtx.state === 'suspended') {
+                console.log('AudioContext is still suspended, resuming for beep.');
+                audioCtx.resume(); // Try to resume
+            }
+
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.start(audioCtx.currentTime);
+                oscillator.stop(audioCtx.currentTime + duration / 1000);
+            } catch (e) {
+                console.error('Error playing beep:', e);
+            }
+        }
+
+        /**
+         * Gets a background color based on activity name.
+         */
+        function getColorForActivity(name) {
+            const lowerName = name.toLowerCase();
+            if (lowerName.includes('sprint') || lowerName.includes('high')) {
+                return 'bg-red-800'; // High intensity
+            }
+            if (lowerName.includes('jog') || lowerName.includes('run') || lowerName.includes('medium')) {
+                return 'bg-yellow-800'; // Medium intensity
+            }
+            if (lowerName.includes('walk') || lowerName.includes('rest') || lowerName.includes('low')) {
+                return 'bg-green-800'; // Low intensity / rest
+            }
+            return 'bg-gray-900'; // Default
+        }
+
+        /**
+         * Renders the list of added segments.
+         */
+        function renderSegmentList() {
+            if (segments.length === 0) {
+                segmentList.innerHTML = '<p class="text-gray-400">Add segments to see your routine here.</p>';
+                startWorkoutBtn.disabled = true;
+                return;
+            }
+
+            segmentList.innerHTML = ''; // Clear list
+            startWorkoutBtn.disabled = false;
+
+            segments.forEach((segment, index) => {
+                const segmentEl = document.createElement('div');
+                segmentEl.className = 'bg-gray-700 p-3 rounded-md flex justify-between items-center';
+                segmentEl.innerHTML = `
+                    <span class="font-medium">${index + 1}. ${segment.name} (${segment.duration}s)</span>
+                    <button data-index="${index}" class="remove-btn text-red-400 hover:text-red-300 font-bold text-xl">&times;</button>
+                `;
+                segmentList.appendChild(segmentEl);
+            });
+
+            // Add event listeners to new remove buttons
+            document.querySelectorAll('.remove-btn').forEach(btn => {
+                btn.addEventListener('click', handleRemoveSegment);
+            });
+        }
+
+        /**
+         * Handles adding a new timer segment.
+         */
+        function handleAddSegment() {
+            const name = activityNameInput.value.trim() || 'Activity';
+            const duration = parseInt(activityDurationInput.value, 10);
+
+            if (isNaN(duration) || duration <= 0) {
+                // Use a custom modal or message display later
+                console.warn("Please enter a valid duration in seconds.");
+                return;
+            }
+
+            segments.push({
+                name: name,
+                duration: duration,
+                color: getColorForActivity(name)
+            });
+
+            renderSegmentList();
+
+            // Clear inputs
+            activityNameInput.value = '';
+            activityDurationInput.value = '';
+            activityNameInput.focus();
+        }
+
+        /**
+         * Handles removing a segment from the list.
+         */
+        function handleRemoveSegment(event) {
+            const indexToRemove = parseInt(event.target.dataset.index, 10);
+            segments.splice(indexToRemove, 1);
+            renderSegmentList();
+        }
+
+        /**
+         * Starts the entire workout.
+         */
+        function startWorkout() {
+            // === AUDIO UNLOCK ===
+            // This is the CRITICAL FIX. Mobile browsers require a user 
+            // gesture to "unlock" the AudioContext.
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    console.log('AudioContext Resumed on Start!');
+                    beep(50, 1000, 0.1); // Play a tiny click to confirm
+                }).catch(e => {
+                    console.error('AudioContext resume failed:', e);
+                });
+            }
+            // === END AUDIO UNLOCK ===
+
+            totalSets = parseInt(setCountInput.value, 10) || 1;
+            if (segments.length === 0) {
+                console.warn("Please add at least one timer segment.");
+                return;
+            }
+
+            // Reset state
+            currentSet = 1;
+            currentSegmentIndex = 0;
+            isPaused = false;
+            pauseResumeBtn.textContent = 'Pause';
+            
+            // Switch screens
+            configScreen.classList.add('hidden');
+            timerScreen.classList.remove('hidden');
+            timerScreen.classList.add('flex');
+
+            loadSegment(currentSegmentIndex);
+        }
+
+        /**
+         * Loads a specific segment by its index.
+         */
+        function loadSegment(index) {
+            if (timerInterval) clearInterval(timerInterval); // Clear previous interval
+
+            const segment = segments[index];
+            timeLeft = segment.duration;
+
+            // Update UI
+            currentActivityDisplay.textContent = segment.name;
+            currentTimeDisplay.textContent = timeLeft;
+            currentSetDisplay.textContent = `Set ${currentSet} / ${totalSets}`;
+            
+            // Update Next Up display
+            const isLastSegment = (index === segments.length - 1);
+            const isLastSet = (currentSet === totalSets);
+
+            if (isLastSegment && isLastSet) {
+                nextActivityDisplay.textContent = 'Finish!';
+            } else if (isLastSegment) {
+                nextActivityDisplay.textContent = `Next: ${segments[0].name}`;
+            } else {
+                nextActivityDisplay.textContent = `Next: ${segments[index + 1].name}`;
+            }
+
+            // Update background color
+            timerScreen.className = timerScreen.className.replace(/bg-\S+-\d+/g, segment.color);
+
+
+            // Start the countdown
+            timerInterval = setInterval(tick, 1000);
+        }
+
+        /**
+         * The 1-second interval "tick".
+         */
+        function tick() {
+            if (isPaused) return;
+
+            timeLeft--;
+            currentTimeDisplay.textContent = timeLeft;
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                
+                // Check if workout is completely finished
+                const isLastSegment = (currentSegmentIndex === segments.length - 1);
+                const isLastSet = (currentSet === totalSets);
+
+                if (isLastSegment && isLastSet) {
+                    finishWorkout(); // Go directly to finish, no transition
+                } else {
+                    startTransition(); // Start 2s transition
+                }
+            }
+        }
+
+        /**
+         * Starts a 2-second transition period before the next segment.
+         */
+        function startTransition() {
+            // Play a sound to signal transition (1-second long, C5 note)
+            beep(1000, 523.25, 0.5, 'square'); 
+
+            // Determine next activity name
+            let nextSegmentIndex = currentSegmentIndex + 1;
+            let nextActivityName = '';
+            if (nextSegmentIndex >= segments.length) {
+                nextActivityName = segments[0].name; // Start of next set
+            } else {
+                nextActivityName = segments[nextSegmentIndex].name;
+            }
+
+            // Update UI for transition
+            timerScreen.className = timerScreen.className.replace(/bg-\S+-\d+/g, 'bg-blue-700'); // Neutral blue color
+            currentActivityDisplay.textContent = "Get Ready";
+            nextActivityDisplay.textContent = `Next: ${nextActivityName}`;
+            
+            let transitionTimeLeft = 2; // 2 second transition
+            currentTimeDisplay.textContent = transitionTimeLeft;
+
+            timerInterval = setInterval(() => {
+                if (isPaused) return; // Respect pause during transition
+
+                transitionTimeLeft--;
+                currentTimeDisplay.textContent = transitionTimeLeft;
+
+                if (transitionTimeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    nextSegment(); // Move to the actual next segment
+                }
+            }, 1000);
+        }
+
+
+        /**
+         * Moves to the next segment or set, or finishes the workout.
+         */
+        function nextSegment() {
+            currentSegmentIndex++;
+
+            if (currentSegmentIndex >= segments.length) {
+                // End of a set
+                currentSet++;
+                currentSegmentIndex = 0;
+
+                // This logic is slightly adjusted, finishWorkout is now called from tick()
+                // so this check is simpler.
+            }
+            
+            // Load the next segment
+            loadSegment(currentSegmentIndex);
+        }
+
+        /**
+         * Finishes the workout.
+         */
+        function finishWorkout() {
+            clearInterval(timerInterval);
+            timerScreen.className = timerScreen.className.replace(/bg-\S+-\d+/g, 'bg-blue-800');
+            
+            currentActivityDisplay.textContent = "Workout";
+            currentTimeDisplay.textContent = "Done";
+            currentSetDisplay.textContent = `Completed ${totalSets} sets!`;
+            nextActivityDisplay.textContent = "Good job!";
+            
+            pauseResumeBtn.disabled = true;
+            
+            // Play a success sound
+            beep(200, 440); // A
+            setTimeout(() => beep(200, 660), 250); // E
+            setTimeout(() => beep(200, 880), 500); // A (octave)
+        }
+
+        /**
+         * Pauses or resumes the timer.
+         */
+        function handlePauseResume() {
+            // Also try to unlock audio here, in case it gets suspended
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseResumeBtn.textContent = 'Resume';
+                pauseResumeBtn.classList.remove('bg-yellow-500', 'text-gray-900');
+                pauseResumeBtn.classList.add('bg-cyan-500', 'text-white');
+            } else {
+                pauseResumeBtn.textContent = 'Pause';
+                pauseResumeBtn.classList.add('bg-yellow-500', 'text-gray-900');
+                pauseResumeBtn.classList.remove('bg-cyan-500', 'text-white');
+            }
+        }
+
+        /**
+         * Resets the app to the config screen.
+         */
+        function handleReset() {
+            if (timerInterval) clearInterval(timerInterval);
+
+            // Reset state
+            currentSet = 1;
+            currentSegmentIndex = 0;
+            timeLeft = 0;
+            isPaused = false;
+            pauseResumeBtn.textContent = 'Pause';
+            pauseResumeBtn.disabled = false;
+            pauseResumeBtn.classList.add('bg-yellow-500', 'text-gray-900');
+            pauseResumeBtn.classList.remove('bg-cyan-500', 'text-white');
+
+            // Switch screens
+            timerScreen.classList.add('hidden');
+            timerScreen.classList.remove('flex');
+            configScreen.classList.remove('hidden');
+
+            // Reset background
+            timerScreen.className = timerScreen.className.replace(/bg-\S+-\d+/g, 'bg-gray-900');
+        }
+
+        // === Event Listeners ===
+        addSegmentBtn.addEventListener('click', handleAddSegment);
+        startWorkoutBtn.addEventListener('click', startWorkout);
+        pauseResumeBtn.addEventListener('click', handlePauseResume);
+        resetBtn.addEventListener('click', handleReset);
+        
+        // Add defaults for the user
+        activityNameInput.value = "Sprint";
+        activityDurationInput.value = 30;
+        handleAddSegment();
+        
+        activityNameInput.value = "Jog";
+        activityDurationInput.value = 20;
+        handleAddSegment();
+        
+        activityNameInput.value = "Walk";
+        activityDurationInput.value = 20;
+        handleAddSegment();
+
+        setCountInput.value = 5; // Default to 5 sets
+        
+        // Initial render
+        renderSegmentList();
+
+    </script>
+</body>
+</html>
+
